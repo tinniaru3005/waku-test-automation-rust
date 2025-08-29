@@ -10,7 +10,6 @@ async fn main() -> Result<()> {
     
     let framework = WakuTestFramework::new()?;
     
-    // Example: Run basic node test
     match run_basic_test(&framework).await {
         Ok(_) => info!("Basic test completed successfully"),
         Err(e) => error!("Basic test failed: {}", e),

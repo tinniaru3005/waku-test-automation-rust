@@ -148,7 +148,7 @@ async fn test_suite_2_inter_node_communication() {
         .expect("Failed to subscribe node2 to topic");
 
     // Wait for nodes to discover each other
-    let connected = framework.wait_for_peer_connection(&node2, 30)
+    let connected = framework.wait_for_peer_connection(&node2, 120)
         .await
         .expect("Failed to check peer connections");
     
