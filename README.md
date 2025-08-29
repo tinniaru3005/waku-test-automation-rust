@@ -156,4 +156,5 @@ waku-test-automation/
 
 ## Screenshots
 
-<img width="1243" height="884" alt="Screenshot 2025-08-29 at 9 27 11 PM" src="https://github.com/user-attachments/assets/d487e965-5bbd-4e08-94da-697f1b8186a6" />
+<img width="1243" height="884" alt="Screenshot 2025-08-29 at 9 48 12 PM" src="https://github.com/user-attachments/assets/24b89458-07ea-48f8-ae1d-89708fb007ec" />
+
