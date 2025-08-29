@@ -39,8 +39,8 @@ Key dependencies include:
 
 1. **Clone the repository:**
 ```bash
-git clone <repository-url>
-cd waku-test-automation
+git clone git@github.com:tinniaru3005/waku-test-automation-rust.git
+cd waku-test-automation-rust
 ```
 
 2. **Install Rust dependencies:**
@@ -154,24 +154,6 @@ waku-test-automation/
 - `wait_for_peer_connection()` - Wait for peer discovery
 - `cleanup_*()` - Resource cleanup methods
 
-## Configuration Options
+## Screenshots
 
-### Default Node Configuration
-```rust
-WakuNodeConfig {
-    name: "waku-node".to_string(),
-    rest_port: 21161,
-    tcp_port: 21162, 
-    websocket_port: 21163,
-    discv5_port: 21164,
-    external_ip: "172.18.111.226".to_string(),
-    bootstrap_node: None,
-}
-```
-
-### Customization Example
-```rust
-let config = WakuNodeConfig {
-    name: "custom-node".to_string(),
-    rest_port: 8080,
-    external_ip: "172.
+<img width="1172" height="884" alt="Screenshot 2025-08-29 at 3 49 16 PM" src="https://github.com/user-attachments/assets/3c6bcb18-b989-4bb6-bae7-eadc7219288a" />
