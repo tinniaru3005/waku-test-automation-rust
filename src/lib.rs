@@ -6,7 +6,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 
 #[derive(Debug, Clone)]
 pub struct WakuNode {
@@ -139,10 +139,10 @@ impl WakuTestFramework {
             .await
             .context("Failed to start container")?;
 
-        // Wait for container to be ready
-        sleep(Duration::from_secs(5)).await;
+        // Wait for container to be ready with longer timeout
+        sleep(Duration::from_secs(8)).await;
 
-        let mut node = WakuNode {
+        let node = WakuNode {
             container_id: container.id,
             name: node_config.name,
             rest_port: node_config.rest_port,
@@ -152,9 +152,6 @@ impl WakuTestFramework {
             external_ip: node_config.external_ip,
             enr_uri: None,
         };
-
-        // Get node info and ENR URI
-        node.enr_uri = Some(self.get_node_info(&node).await?.enr_uri);
         
         Ok(node)
     }
@@ -175,13 +172,17 @@ impl WakuTestFramework {
             .await
             .context("Failed to connect container to network")?;
 
+        // Wait a bit for network connection to be established
+        sleep(Duration::from_secs(2)).await;
+
         Ok(())
     }
 
     pub async fn get_node_info(&self, node: &WakuNode) -> Result<NodeInfo> {
         let url = format!("http://127.0.0.1:{}/debug/v1/info", node.rest_port);
         
-        for attempt in 1..=5 {
+        for attempt in 1..=10 { // Increased attempts
+            debug!("Attempting to get node info (attempt {})", attempt);
             match self.client.get(&url).send().await {
                 Ok(response) if response.status().is_success() => {
                     // Try parsing as direct NodeInfo first, then as wrapped response
@@ -190,11 +191,13 @@ impl WakuTestFramework {
                     
                     // Try direct parsing first
                     if let Ok(node_info) = serde_json::from_str::<NodeInfo>(&text) {
+                        info!("Successfully got node info for {}", node.name);
                         return Ok(node_info);
                     }
                     
                     // Try wrapped response format
                     if let Ok(api_response) = serde_json::from_str::<ApiResponse<NodeInfo>>(&text) {
+                        info!("Successfully got node info for {}", node.name);
                         return Ok(api_response.data);
                     }
                     
@@ -210,12 +213,12 @@ impl WakuTestFramework {
                 }
             }
             
-            if attempt < 5 {
-                sleep(Duration::from_secs(2)).await;
+            if attempt < 10 {
+                sleep(Duration::from_secs(3)).await; // Longer sleep between attempts
             }
         }
         
-        Err(anyhow::anyhow!("Failed to get node info after 5 attempts"))
+        Err(anyhow::anyhow!("Failed to get node info after 10 attempts"))
     }
 
     pub async fn subscribe_to_topic(&self, node: &WakuNode, topic: &str) -> Result<()> {
@@ -271,8 +274,10 @@ impl WakuTestFramework {
         if response.status().is_success() {
             let messages: Vec<ReceivedMessage> = response.json().await
                 .context("Failed to parse messages response")?;
+            debug!("Got {} messages from node {}", messages.len(), node.name);
             Ok(messages)
         } else {
+            debug!("No messages found for node {} on topic {}", node.name, topic);
             Ok(vec![])
         }
     }
@@ -289,9 +294,32 @@ impl WakuTestFramework {
         if response.status().is_success() {
             let peers: Vec<PeerInfo> = response.json().await
                 .context("Failed to parse peers response")?;
+            debug!("Node {} has {} peers", node.name, peers.len());
             Ok(peers)
         } else {
+            debug!("Failed to get peers for node {}", node.name);
             Ok(vec![])
+        }
+    }
+
+    pub async fn connect_peer(&self, node: &WakuNode, peer_multiaddr: &str) -> Result<()> {
+        let url = format!("http://127.0.0.1:{}/admin/v1/peers", node.rest_port);
+        let payload = json!({"multiaddr": peer_multiaddr});
+
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .context("Failed to send connect peer request")?;
+
+        if response.status().is_success() {
+            info!("Successfully connected node {} to peer {}", node.name, peer_multiaddr);
+            Ok(())
+        } else {
+            warn!("Failed to connect to peer: {}", response.status());
+            Ok(()) // Don't fail, as discovery might still work
         }
     }
 
@@ -300,13 +328,16 @@ impl WakuTestFramework {
         
         while start.elapsed().as_secs() < timeout_secs {
             if let Ok(peers) = self.get_peers(node).await {
+                debug!("Node {} has {} peers", node.name, peers.len());
                 if !peers.is_empty() && peers.iter().any(|p| p.connected) {
+                    info!("Node {} is connected to peers", node.name);
                     return Ok(true);
                 }
             }
             sleep(Duration::from_secs(5)).await;
         }
         
+        warn!("Node {} did not connect to any peers within {} seconds", node.name, timeout_secs);
         Ok(false)
     }
 
@@ -440,7 +471,7 @@ fn create_waku_command(config: &WakuNodeConfig) -> Vec<String> {
         "--rest=true".to_string(),
         "--rest-admin=true".to_string(),
         "--websocket-support=true".to_string(),
-        "--log-level=TRACE".to_string(),
+        "--log-level=INFO".to_string(), // Reduced log level for cleaner output
         "--rest-relay-cache-capacity=100".to_string(),
         format!("--websocket-port={}", config.websocket_port),
         format!("--rest-port={}", config.rest_port),
@@ -451,10 +482,12 @@ fn create_waku_command(config: &WakuNodeConfig) -> Vec<String> {
         "--peer-exchange=true".to_string(),
         "--discv5-discovery=true".to_string(),
         "--relay=true".to_string(),
+        "--max-connections=50".to_string(), // Allow more connections
     ];
     
     if let Some(bootstrap) = &config.bootstrap_node {
         cmd.push(format!("--discv5-bootstrap-node={}", bootstrap));
+        info!("Added bootstrap node: {}", bootstrap);
     }
     
     cmd
