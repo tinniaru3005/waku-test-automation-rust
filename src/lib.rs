@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use bollard::{Docker, container::{CreateContainerOptions, Config, StartContainerOptions, ListContainersOptions}, network::{CreateNetworkOptions, ConnectNetworkOptions}, models::{Ipam, IpamConfig, HostConfig, EndpointSettings, PortBinding}};
+use bollard::{Docker, container::{CreateContainerOptions, Config, StartContainerOptions}, network::{CreateNetworkOptions, ConnectNetworkOptions}, models::{Ipam, IpamConfig, HostConfig, EndpointSettings, PortBinding}};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
